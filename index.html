@@ -11,14 +11,10 @@ body{
   margin:0;
   padding:20px;
 }
-.topbarContainer{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:15px;
-}
 .topbar{
   text-align:center;
+  margin-bottom:15px;
+  position: relative;
 }
 .topbar button{
   padding:10px 20px;
@@ -30,11 +26,14 @@ body{
   color:white;
   cursor:pointer;
 }
-.kemmsTop{
+.kemms{
+  position:absolute;
+  top:0;
+  left:0;
   font-size:14px;
   color:#22c55e;
   font-weight:bold;
-  margin-left:10px;
+  padding:10px;
 }
 .header{
   text-align:center;
@@ -73,10 +72,10 @@ body{
 .card.active{
   box-shadow: 0 0 30px #22c55e;
   transform: scale(1.05);
-  background:#22c55e;
+  background:#22c55e; /* krátké zelené bliknutí */
 }
 .card.assigned{
-  background:#22c55e33;
+  background:#22c55e33; /* bledě zelená po bliknutí */
 }
 .lis{
   font-size:34px;
@@ -169,13 +168,11 @@ input{
 </head>
 <body>
 
-<div class="topbarContainer">
-  <div class="kemmsTop">KEMMSOFT BETA 3</div>
-  <div class="topbar" id="topbar">
-    <button onclick="setupMode()">Nastavení</button>
-    <button onclick="productionMode()">Výrobní obrazovka</button>
-    <button onclick="requestsMode()">Zadání požadavku</button>
-  </div>
+<div class="topbar" id="topbar">
+  <div class="kemms">KEMMSOFT BETA 3</div>
+  <button onclick="setupMode()">Nastavení</button>
+  <button onclick="productionMode()">Výrobní obrazovka</button>
+  <button onclick="requestsMode()">Zadání požadavku</button>
 </div>
 
 <div class="header" id="mainHeader">---</div>
@@ -219,7 +216,6 @@ input{
 </div>
 
 <script>
-// --- Data ---
 const LIS_COUNT = 7;
 let lisy=[], pozadavky=[];
 
@@ -396,16 +392,25 @@ function requestsMode(){
 }
 
 // OTEVŘENÍ KARTY ZADÁNÍ POŽADAVKU PŘES URL ?pozadavky
-window.addEventListener("load",()=>{ 
+window.addEventListener("load",()=>{
   if(window.location.search.includes("pozadavky")) requestsMode();
 });
 
+// REFRESH DAT KAŽDÝCH 30s
+setInterval(()=>{
+  const currentMode = document.getElementById("setupScreen").style.display!=="none" ? "setup" :
+                      document.getElementById("productionScreen").style.display!=="none" ? "production" :
+                      "requests";
+  load();
+  render();
+  // zachovat aktuální režim
+  if(currentMode==="setup") setupMode();
+  else if(currentMode==="production") productionMode();
+  else if(currentMode==="requests") requestsMode();
+}, 30000);
+
 window.addEventListener("storage",()=>{load(); render();});
 load(); render();
-
-// --- Automatický refresh každých 30 sekund ---
-setInterval(()=>{window.location.reload();},30000);
 </script>
-
 </body>
 </html>
