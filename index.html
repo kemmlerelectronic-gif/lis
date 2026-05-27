@@ -42,7 +42,15 @@
         
         .card { min-width: 500px; background: var(--card-bg); padding: 40px; border-radius: 20px; border: 2px solid var(--primary); box-shadow: 0 20px 40px rgba(0,0,0,0.8); flex-shrink: 0; position: relative; }
         .card.is-key { border-color: var(--warning); }
+        .card.is-key::before { content: "⭐ KLÍČOVÝ DÍL"; position: absolute; top: -15px; left: 20px; background: var(--warning); color: black; padding: 2px 15px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
         .card.is-critical { border-color: var(--danger); background: rgba(60, 0, 0, 0.9); box-shadow: 0 0 50px rgba(255, 77, 77, 0.4); }
+        
+        .card.is-key.is-critical { animation: alert-pulse 1.5s infinite; }
+        @keyframes alert-pulse {
+            0% { border-color: var(--warning); }
+            50% { border-color: var(--danger); box-shadow: 0 0 60px var(--danger); }
+            100% { border-color: var(--warning); }
+        }
 
         .stock-val { font-size: 5rem; font-weight: 900; }
         .delta-val { font-size: 1.5rem; margin-top: 10px; }
@@ -52,6 +60,7 @@
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; color: var(--primary); padding: 15px; border-bottom: 2px solid var(--primary); }
         td { padding: 15px; border-bottom: 1px solid #222; }
+        .row-key { color: var(--warning) !important; font-weight: bold; }
         
         .critical-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--danger); color: white; padding: 12px 0; font-weight: bold; overflow: hidden; z-index: 10; }
         .ticker-wrap { display: inline-block; animation: ticker-move 30s linear infinite; white-space: nowrap; }
@@ -59,6 +68,7 @@
 
         .admin-form { background: var(--card-bg); padding: 40px; border-radius: 20px; border: 1px solid var(--primary); width: 420px; }
         input { width: 100%; padding: 12px; margin: 8px 0; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; box-sizing: border-box; }
+        .checkbox-group { margin: 15px 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -71,7 +81,7 @@
         <div class="brand">KEMMSOFT STOCK 8V</div>
         <div class="voice-status">
             <div class="pulse-mic" id="mic-indicator"></div>
-            <span id="status-text">Hlasový asistent připraven (Řekněte "KEMSOFT")</span>
+            <span id="status-text">Klikněte kamkoli pro aktivaci mikrofonu</span>
         </div>
         <nav>
             <button onclick="showSection('overview')">Přehled (TV)</button>
@@ -80,11 +90,12 @@
         </nav>
     </div>
 
+    <!-- SEKCE: HLASOVÝ DIALOG -->
     <div id="voice-dialog" class="section">
         <div id="voice-overlay">
             <h1 id="voice-prompt" style="color: var(--primary); font-size: 2.5rem;">Naslouchám...</h1>
             <div id="voice-card-showcase"></div>
-            <div class="speech-preview" id="speech-preview">Pro mluvení počkejte na pípnutí/výzvu.</div>
+            <div class="speech-preview" id="speech-preview">Čekám na aktivační příkaz...</div>
         </div>
     </div>
 
@@ -97,7 +108,7 @@
         <div class="inventory-container">
             <h1>Skladová evidence</h1>
             <table>
-                <thead><tr><th>ID</th><th>Název</th><th>Skladem</th><th>Minimum</th><th>Status</th></tr></thead>
+                <thead><tr><th>ID</th><th>Název</th><th>Skladem</th><th>Minimum</th><th>Priorita</th><th>Status</th></tr></thead>
                 <tbody id="inventory-list"></tbody>
             </table>
         </div>
@@ -105,47 +116,90 @@
 
     <div id="admin" class="section">
         <div class="admin-form">
-            <h2>Nový díl (Základní registrace)</h2>
-            <input type="text" id="itemNum" placeholder="Katalogové číslo (ID)">
+            <h2>Aktualizace dat</h2>
+            <input type="text" id="itemNum" placeholder="ID (Katalogové číslo)">
             <input type="text" id="itemName" placeholder="Název náhradního dílu">
-            <input type="number" id="itemCount" placeholder="Počet kusů">
-            <input type="number" id="itemMin" placeholder="Minimální zásoba">
-            <button onclick="addItem()" style="width: 100%; margin-top: 10px; background: var(--primary); color: black;">ULOŽIT</button>
+            <input type="number" id="itemCount" placeholder="Aktuální stav (ks)">
+            <input type="number" id="itemMin" placeholder="Minimální limit (ks)">
+            <label class="checkbox-group">
+                <input type="checkbox" id="itemKey" style="width: auto;"> Klíčový náhradní díl (PRIORITA)
+            </label>
+            <button onclick="addItem()" style="width: 100%; margin-top: 10px; background: var(--primary); color: black;">ULOŽIT ZMĚNY</button>
+            <button onclick="clearAll()" style="width: 100%; margin-top: 20px; opacity: 0.3; font-size: 0.7rem;">Resetovat celý systém</button>
         </div>
     </div>
 
     <script>
-        let stock = JSON.parse(localStorage.getItem('k_stock_voice_v1')) || [
+        let stock = JSON.parse(localStorage.getItem('k_stock_v8_priorities')) || [
             { id: "101", name: "Senzor tlaku", count: 12, min: 5, isKey: false },
             { id: "102", name: "Servomotor 8V", count: 2, min: 3, isKey: true }
         ];
         let pos = 0;
         let animationFrame;
         
-        // Hlasové řízení - stavový automat
         let voiceState = "IDLE"; 
-        let currentAction = null; // "naskladnit" nebo "vyskladnit"
+        let currentAction = null; 
         let targetItem = null;
         let targetQty = 0;
+        let isRecognitionRunning = false;
+        let systemInitialized = false;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Tento prohlížeč nepodporuje rozpoznávání hlasu. Použijte Google Chrome.");
+        }
+        
         const recognition = new SpeechRecognition();
         recognition.lang = 'cs-CZ';
-        recognition.continuous = true;
+        recognition.continuous = false; 
         recognition.interimResults = false;
 
         function speak(text, callback) {
+            try { recognition.stop(); } catch(e) {}
+            
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'cs-CZ';
-            utterance.onend = () => { if (callback) callback(); };
+            utterance.onend = () => { 
+                if (callback) callback();
+                startSpeechRecognition(); 
+            };
             window.speechSynthesis.speak(utterance);
         }
+
+        function startSpeechRecognition() {
+            if (!systemInitialized) return;
+            if (!isRecognitionRunning) {
+                try {
+                    recognition.start();
+                } catch(e) {}
+            }
+        }
+
+        recognition.onstart = function() {
+            isRecognitionRunning = true;
+            if(voiceState === "IDLE") {
+                document.getElementById('status-text').innerText = 'Hlasový asistent aktivní (Řekněte "KEMSOFT")';
+                document.getElementById('mic-indicator').className = "pulse-mic";
+            }
+        };
+
+        recognition.onend = function() {
+            isRecognitionRunning = false;
+            setTimeout(startSpeechRecognition, 400);
+        };
+
+        recognition.onerror = function(event) {
+            console.log("Hlasová chyba: ", event.error);
+            if (event.error === 'not-allowed') {
+                document.getElementById('status-text').innerText = "Chyba: Povolte mikrofon v adresním řádku!";
+                document.getElementById('status-text').style.color = "var(--danger)";
+            }
+        };
 
         recognition.onresult = function(event) {
             const result = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
             document.getElementById('speech-preview').innerText = `Slyšel jsem: "${result}"`;
             
-            // Globální příkaz pro ukončení
             if (result.includes("konec")) {
                 speak("Ukončuji operaci.", () => { resetVoiceSystem(); });
                 return;
@@ -156,7 +210,7 @@
                     if (result.includes("kemsoft") || result.includes("kemmsoft")) {
                         voiceState = "ACTION_CHOOSE";
                         document.getElementById('mic-indicator').classList.add('listening');
-                        document.getElementById('status-text').innerText = "Systém KEMSOFT aktivní";
+                        document.getElementById('status-text').innerText = "Systém KEMSOFT naslouchá požadavku";
                         showSection('voice-dialog');
                         document.getElementById('voice-overlay').style.display = 'block';
                         document.getElementById('voice-prompt').innerText = "Chcete naskladnit nebo vyskladnit?";
@@ -172,12 +226,11 @@
                         currentAction = "OUT";
                         goToGetItem();
                     } else {
-                        speak("Nerozuměla jsem. Řekněte naskladnit nebo vyskladnit.");
+                        speak("Řekněte naskladnit nebo vyskladnit.");
                     }
                     break;
 
                 case "ITEM_CHOOSE":
-                    // Hledání podle názvu v databázi
                     let found = stock.find(item => result.includes(item.name.toLowerCase()) || result.includes(item.id));
                     if (found) {
                         targetItem = found;
@@ -191,13 +244,12 @@
                     break;
 
                 case "QTY_CHOOSE":
-                    // Extrakce čísla z textu
                     let match = result.match(/\d+/);
                     if (match) {
                         targetQty = parseInt(match[0]);
                         executeVoiceTransaction();
                     } else {
-                        speak("Zadejte množství číslem.");
+                        speak("Zadejte množství čísly.");
                     }
                     break;
             }
@@ -222,15 +274,17 @@
                 targetItem.count -= targetQty;
             }
 
-            // Uložení dat
-            localStorage.setItem('k_stock_voice_v1', JSON.stringify(stock));
+            localStorage.setItem('k_stock_v8_priorities', JSON.stringify(stock));
 
-            // Zobrazení výsledné karty na displeji
             const critical = targetItem.count <= targetItem.min;
             document.getElementById('voice-prompt').innerText = "Transakce dokončena";
             document.getElementById('voice-card-showcase').innerHTML = `
-                <div class="card ${critical ? 'is-critical' : ''}" style="margin: 30px auto; float:none;">
-                    <h2>ID: ${targetItem.id} - ${targetItem.name}</h2>
+                <div class="card ${targetItem.isKey ? 'is-key' : ''} ${critical ? 'is-critical' : ''}" style="margin: 30px auto; float:none;">
+                    <div style="display:flex; justify-content:space-between; color: ${targetItem.isKey ? 'var(--warning)' : 'var(--primary)'}">
+                        <span>ID: ${targetItem.id}</span>
+                        <span>${critical ? 'STAV: KRITICKÝ' : 'STAV: OK'}</span>
+                    </div>
+                    <h1 style="margin: 20px 0;">${targetItem.name}</h1>
                     <div class="stock-val">${targetItem.count} <small style="font-size:1.5rem">ks</small></div>
                     <div class="delta-val" style="color: ${currentAction === 'IN' ? '#2ecc71' : 'var(--danger)'}">
                         ${currentAction === 'IN' ? '▲ Přidáno' : '▼ Odebráno'}: ${targetQty} ks (Původně: ${oldQty} ks)
@@ -238,7 +292,7 @@
                 </div>
             `;
 
-            speak(`Položka ${targetItem.name} aktualizována na ${targetItem.count} kusů. Pro ukončení řekněte konec.`);
+            speak(`Položka ${targetItem.name} aktualizována na ${targetItem.count} kusů. Pro restart nebo návrat na přehled řekněte konec.`);
         }
 
         function resetVoiceSystem() {
@@ -249,14 +303,10 @@
             document.getElementById('mic-indicator').classList.remove('listening');
             document.getElementById('status-text').innerText = 'Hlasový asistent připraven (Řekněte "KEMSOFT")';
             document.getElementById('voice-card-showcase').innerHTML = '';
-            document.getElementById('speech-preview').innerText = '';
+            document.getElementById('speech-preview').innerText = 'Čekám na aktivační příkaz...';
             showSection('overview');
         }
 
-        // Restart mikrofonu v případě odpojení
-        recognition.onend = function() { recognition.start(); };
-
-        // Původní aplikační logika
         function showSection(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -271,16 +321,29 @@
             const name = document.getElementById('itemName').value.trim();
             const count = parseInt(document.getElementById('itemCount').value);
             const min = parseInt(document.getElementById('itemMin').value);
+            const isKey = document.getElementById('itemKey').checked;
+
             if (!id || isNaN(count)) return alert('Zadejte data!');
-            stock.push({ id, name: name || "Díl X", count, min: min || 0 });
-            localStorage.setItem('k_stock_voice_v1', JSON.stringify(stock));
+            
+            const existingIndex = stock.findIndex(item => item.id === id);
+            if (existingIndex !== -1) {
+                stock[existingIndex].count = count;
+                if(name) stock[existingIndex].name = name;
+                if(!isNaN(min)) stock[existingIndex].min = min;
+                stock[existingIndex].isKey = isKey;
+            } else {
+                stock.push({ id, name: name || "Díl X", count, min: min || 0, isKey });
+            }
+            localStorage.setItem('k_stock_v8_priorities', JSON.stringify(stock));
             alert('Uloženo!');
+            document.querySelectorAll('input:not([type="checkbox"])').forEach(i => i.value = '');
+            document.getElementById('itemKey').checked = false;
         }
 
         function renderTable() {
             document.getElementById('inventory-list').innerHTML = stock.map(item => `
-                <tr style="color: ${item.count <= item.min ? 'var(--danger)' : 'white'}">
-                    <td>${item.id}</td><td>${item.name}</td><td><strong>${item.count} ks</strong></td><td>${item.min} ks</td><td>${item.count <= item.min ? '⚠️ DOPLNIT' : '✅ OK'}</td>
+                <tr style="color: ${item.count <= item.min ? 'var(--danger)' : 'white'}" class="${item.isKey ? 'row-key' : ''}">
+                    <td>${item.id}</td><td>${item.isKey ? '⭐ ' : ''}${item.name}</td><td><strong>${item.count} ks</strong></td><td>${item.min} ks</td><td>${item.isKey ? 'KLÍČOVÝ' : 'Běžný'}</td><td>${item.count <= item.min ? '⚠️ DOPLNIT' : '✅ OK'}</td>
                 </tr>
             `).join('');
         }
@@ -289,14 +352,17 @@
             const track = document.getElementById('carousel-track');
             if (stock.length === 0) return;
             const fullList = [...stock, ...stock, ...stock];
-            track.innerHTML = fullList.map(item => `
-                <div class="card ${item.count <= item.min ? 'is-critical' : ''}">
-                    <div style="display:flex; justify-content:space-between; color:var(--primary)"><span>ID: ${item.id}</span></div>
-                    <h1 style="margin: 20px 0;">${item.name}</h1>
-                    <div class="stock-val">${item.count} <small style="font-size: 1.5rem">ks</small></div>
-                    <p>Minimum: ${item.min} ks</p>
-                </div>
-            `).join('');
+            track.innerHTML = fullList.map(item => {
+                const critical = item.count <= item.min;
+                return `
+                    <div class="card ${item.isKey ? 'is-key' : ''} ${critical ? 'is-critical' : ''}">
+                        <div style="display:flex; justify-content:space-between; color: ${item.isKey ? 'var(--warning)' : 'var(--primary)'}"><span>ID: ${item.id}</span></div>
+                        <h1 style="margin: 20px 0;">${item.name}</h1>
+                        <div class="stock-val">${item.count} <small style="font-size: 1.5rem">ks</small></div>
+                        <p>Minimum: ${item.min} ks</p>
+                    </div>
+                `;
+            }).join('');
             pos = 0;
             animate();
         }
@@ -314,17 +380,21 @@
         function updateTicker() {
             const criticals = stock.filter(i => i.count <= i.min);
             document.getElementById('ticker-content').innerHTML = criticals.length > 0 ? 
-                "⚠️ NEDOSTATEK ZÁSOB: " + criticals.map(i => `${i.name} (${i.count}ks)`).join(" +++ ") : "VŠECHNY POLOŽKY V NORMĚ • KEMMSOFT 8V";
+                "⚠️ NEDOSTATEK ZÁSOB: " + criticals.map(i => `${i.isKey ? '⭐PRIORITA! ' : ''}${i.name} (${i.count}ks)`).join(" +++ ") : "VŠECHNY POLOŽKY V NORMĚ • KEMMSOFT 8V";
         }
 
-        // Spuštění hlasového engine na pozadí při startu
+        function clearAll() { if(confirm('Smazat vše?')) { localStorage.clear(); stock = []; location.reload(); } }
+
+        // První interakce uživatele pro odblokování audio kontextu prohlížeče
         window.onload = () => {
             initCarousel();
-            try {
-                recognition.start();
-            } catch(e) {
-                console.log("Mikrofon už běží.");
-            }
+            document.body.addEventListener('click', () => {
+                if(!systemInitialized) {
+                    systemInitialized = true;
+                    isRecognitionRunning = false;
+                    startSpeechRecognition();
+                }
+            }, { once: true });
         };
     </script>
 </body>
