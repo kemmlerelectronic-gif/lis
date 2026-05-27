@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KEMMSOFT STOCK 888V - Voice Controlled Final</title>
+    <title>KEMMSOFT 8V - Voice Controlled Final</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -17,7 +17,7 @@
         body, html { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; color: white; overflow: hidden; height: 100vh; background: #000; }
         #video-bg { position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -1; filter: brightness(15%); }
 
-        .header-ui { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 20px; z-index: 1000; }
+        .header-ui { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 20px; z-index: 1000; box-sizing: border-box; }
         .brand { font-size: 1.8rem; font-weight: 900; color: var(--primary); letter-spacing: 3px; }
         
         .voice-status { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1rem; }
@@ -132,8 +132,8 @@
         let recognition = null;
         let isSpeaking = false;
         let shouldListen = false;
+        let restartTimeout = null;
 
-        // Bezpečné založení Speech Recognition bez pádů
         try {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRecognition) {
@@ -149,6 +149,8 @@
         function speak(text, callback) {
             isSpeaking = true;
             shouldListen = false;
+            if (restartTimeout) clearTimeout(restartTimeout);
+            
             try { recognition.stop(); } catch(e) {}
             
             const utterance = new SpeechSynthesisUtterance(text);
@@ -157,8 +159,7 @@
             utterance.onend = () => { 
                 isSpeaking = false;
                 shouldListen = true;
-                // Malá pauza předtím, než začneme zase poslouchat
-                setTimeout(triggerListen, 300);
+                restartTimeout = setTimeout(triggerListen, 400);
                 if (callback) callback();
             };
             window.speechSynthesis.speak(utterance);
@@ -169,7 +170,7 @@
             try {
                 recognition.start();
             } catch(e) {
-                // Zachytí případné stavy, kdy už běželo
+                // Zachytí pokusy o duplicitní spuštění
             }
         }
 
@@ -184,21 +185,25 @@
             };
 
             recognition.onend = function() {
-                // Klíčový fix: restartujeme pouze, pokud máme aktivně naslouchat
+                if (restartTimeout) clearTimeout(restartTimeout);
+                // Když Edge nebo Chrome ukončí spojení (aborted nebo ticho), s lehkou pauzou nahodíme znovu
                 if (shouldListen && !isSpeaking) {
-                    setTimeout(triggerListen, 300);
+                    restartTimeout = setTimeout(triggerListen, 500);
                 }
             };
 
             recognition.onerror = function(event) {
-                console.log("Konzole hlásí error: ", event.error);
+                console.log("Hlasový log hlásí stav: ", event.error);
                 if (event.error === 'not-allowed') {
-                    document.getElementById('status-text').innerText = "Chyba: Povolte mikrofon nahoře v zámku URL!";
+                    document.getElementById('status-text').innerText = "Chyba: Povolte mikrofon nahoře v URL adrese!";
                     document.getElementById('status-text').style.color = "var(--danger)";
                 }
-                // Při jakékoliv chybě (včetně aborted) zkusíme bezpečně nahodit smyčku znova
+                
+                if (restartTimeout) clearTimeout(restartTimeout);
+                // Inteligentní prodleva při chybách (zejména při 'aborted' z Edge)
                 if (shouldListen && !isSpeaking) {
-                    setTimeout(triggerListen, 600);
+                    let delay = event.error === 'aborted' ? 800 : 400;
+                    restartTimeout = setTimeout(triggerListen, delay);
                 }
             };
 
@@ -387,7 +392,6 @@
 
         function clearAll() { if(confirm('Smazat vše?')) { localStorage.clear(); stock = []; location.reload(); } }
 
-        // Start systému až po prvním kliku (Bezpečnostní politika Chrome)
         window.onload = () => {
             initCarousel();
             document.body.addEventListener('click', () => {
