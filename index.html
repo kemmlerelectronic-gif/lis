@@ -1,673 +1,331 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KEMMSOFT STOCK 8V - Hlasový sklad</title>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEMMSOFT STOCK 8V - Voice Controlled</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d4ff;
+            --danger: #ff4d4d;
+            --warning: #ffcc00;
+            --bg-dark: rgba(0, 0, 0, 0.95);
+            --card-bg: rgba(20, 20, 20, 0.9);
+        }
 
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #fff;
-        overflow: hidden;
-        height: 100vh;
-        background: #0a0a0a;
-    }
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; color: white; overflow: hidden; height: 100vh; background: #000; }
+        #video-bg { position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -1; filter: brightness(15%); }
 
-    #bgVideo {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        object-fit: cover;
-        z-index: -2;
-        filter: brightness(0.3);
-    }
+        .header-ui { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 20px; z-index: 1000; }
+        .brand { font-size: 1.8rem; font-weight: 900; color: var(--primary); letter-spacing: 3px; }
+        
+        /* Indikátor mikrofonu */
+        .voice-status { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1rem; }
+        .pulse-mic { width: 12px; height: 12px; background: #2ecc71; border-radius: 50%; }
+        .pulse-mic.listening { animation: mic-glow 1s infinite; background: var(--danger); }
+        @keyframes mic-glow { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,77,0.7); } 70% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(255,77,77,0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,77,0); } }
 
-.overlay {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: linear-gradient(135deg, rgba(10,10,30,0.9) 0%, rgba(30,10,50,0.7) 100%);
-        z-index: -1;
-    }
+        nav { display: flex; gap: 10px; margin-right: 40px; }
+        button { background: rgba(0,0,0,0.7); border: 1px solid var(--primary); color: white; padding: 10px 20px; cursor: pointer; font-weight: bold; }
 
-.logo {
-        position: fixed;
-        top: 20px; left: 30px;
-        z-index: 1000;
-        font-size: 28px;
-        font-weight: 900;
-        letter-spacing: 3px;
-        color: #00d9ff;
-        text-shadow: 0 0 20px rgba(0,217,255,0.8), 0 0 40px rgba(0,217,255,0.4);
-    }
+        .section { display: none; height: 100vh; width: 100%; justify-content: center; align-items: center; flex-direction: column; }
+        .active { display: flex; }
 
-.voice-panel {
-        position: fixed;
-        bottom: 40px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 15px;
-        background: rgba(0,0,0,0.85);
-        padding: 25px 40px;
-        border-radius: 20px;
-        border: 2px solid rgba(0,217,255,0.3);
-        backdrop-filter: blur(20px);
-        min-width: 500px;
-    }
+        /* --- HLASOVÝ VIZUÁL --- */
+        #voice-overlay { display: none; background: rgba(0,0,0,0.85); border: 3px dashed var(--primary); padding: 40px; border-radius: 20px; text-align: center; max-width: 600px; box-shadow: 0 0 50px rgba(0,212,255,0.3); z-index: 2000; }
+        .speech-preview { font-style: italic; color: #aaa; margin-top: 20px; min-height: 24px; }
 
-.mic-indicator {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        background: rgba(0,217,255,0.2);
-        border: 4px solid #00d9ff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 48px;
-        transition: all 0.3s;
-    }
+        /* --- CAROUSEL "LINKA" --- */
+        #carousel-viewport { width: 100%; overflow: hidden; position: relative; height: 500px; }
+        #carousel-track { display: flex; gap: 60px; position: absolute; left: 0; will-change: transform; align-items: center; }
+        
+        .card { min-width: 500px; background: var(--card-bg); padding: 40px; border-radius: 20px; border: 2px solid var(--primary); box-shadow: 0 20px 40px rgba(0,0,0,0.8); flex-shrink: 0; position: relative; }
+        .card.is-key { border-color: var(--warning); }
+        .card.is-critical { border-color: var(--danger); background: rgba(60, 0, 0, 0.9); box-shadow: 0 0 50px rgba(255, 77, 77, 0.4); }
 
-.mic-indicator.listening {
-        background: #ff3b3b;
-        border-color: #ff3b3b;
-        animation: pulse-mic 1.5s infinite;
-    }
+        .stock-val { font-size: 5rem; font-weight: 900; }
+        .delta-val { font-size: 1.5rem; margin-top: 10px; }
 
-.mic-indicator.speaking {
-        background: #00ff88;
-        border-color: #00ff88;
-        animation: pulse-mic 1.5s infinite;
-    }
+        /* --- TABULKA & TICKER --- */
+        .inventory-container { width: 85%; max-height: 70vh; overflow-y: auto; background: var(--card-bg); padding: 30px; border-radius: 15px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--primary); padding: 15px; border-bottom: 2px solid var(--primary); }
+        td { padding: 15px; border-bottom: 1px solid #222; }
+        
+        .critical-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--danger); color: white; padding: 12px 0; font-weight: bold; overflow: hidden; z-index: 10; }
+        .ticker-wrap { display: inline-block; animation: ticker-move 30s linear infinite; white-space: nowrap; }
+        @keyframes ticker-move { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
 
-    @keyframes pulse-mic {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(0,217,255,0.7); }
-        50% { box-shadow: 0 0 0 25px rgba(0,217,255,0); }
-    }
-
-.voice-text {
-        font-size: 20px;
-        text-align: center;
-        color: #00d9ff;
-        font-weight: 600;
-        min-height: 60px;
-        display: flex;
-        align-items: center;
-    }
-
-.voice-text.listening { color: #ff3b3b; }
-.voice-text.speaking { color: #00ff88; }
-
-.voice-help {
-        font-size: 14px;
-        color: #888;
-        text-align: center;
-    }
-
-.page {
-        display: none;
-        height: 100vh;
-        padding: 100px 40px 200px;
-        overflow-y: auto;
-    }
-.page.active { display: block; }
-
-.train-container {
-        height: calc(100vh - 280px);
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        position: relative;
-    }
-
-.train-track {
-        display: flex;
-        gap: 60px;
-        animation: trainMove 40s linear infinite;
-        padding-left: 100%;
-    }
-
-.train-track.paused {
-        animation-play-state: paused;
-    }
-
-    @keyframes trainMove {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
-    }
-
-.train-card {
-        min-width: 700px;
-        height: 65vh;
-        background: rgba(20,20,40,0.9);
-        backdrop-filter: blur(20px);
-        border: 3px solid #00d9ff;
-        border-radius: 24px;
-        padding: 50px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        box-shadow: 0 0 60px rgba(0,217,255,0.4);
-        flex-shrink: 0;
-        transition: all 0.3s;
-    }
-
-.train-card.low-stock {
-        border-color: #ff3b3b;
-        box-shadow: 0 0 60px rgba(255,59,59,0.5);
-    }
-
-.train-card.focused {
-        border-color: #00ff88;
-        box-shadow: 0 0 80px rgba(0,255,136,0.8);
-        transform: scale(1.05);
-    }
-
-.train-card.updated {
-        animation: updateFlash 0.8s ease;
-    }
-
-    @keyframes updateFlash {
-        0%, 100% { border-color: #00d9ff; }
-        50% { border-color: #00ff88; box-shadow: 0 0 100px rgba(0,255,136,1); }
-    }
-
-.card-header {
-        text-align: center;
-    }
-
-.card-title {
-        font-size: 42px;
-        font-weight: 900;
-        margin-bottom: 8px;
-        color: #00d9ff;
-    }
-
-.card-number {
-        font-size: 20px;
-        color: #aaa;
-    }
-
-.card-stats {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        margin: 30px 0;
-    }
-
-.stat-box {
-        text-align: center;
-    }
-
-.stat-value {
-        font-size: 90px;
-        font-weight: 900;
-        line-height: 1;
-        transition: all 0.5s;
-    }
-
-.stat-value.low { color: #ff3b3b; }
-.stat-value.ok { color: #00ff88; }
-
-.stat-label {
-        font-size: 18px;
-        color: #888;
-        margin-top: 10px;
-    }
-
-.stock-chart {
-        width: 100%;
-        height: 120px;
-        background: rgba(0,0,0,0.3);
-        border-radius: 12px;
-        padding: 15px;
-        position: relative;
-        margin: 20px 0;
-    }
-
-.chart-bars {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-around;
-        height: 100%;
-        gap: 40px;
-    }
-
-.bar-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 100%;
-        position: relative;
-    }
-
-.bar {
-        width: 100%;
-        background: linear-gradient(to top, #00d9ff, #00ff88);
-        border-radius: 8px 8px 0 0;
-        transition: height 0.5s ease;
-        position: relative;
-        min-height: 4px;
-    }
-
-.bar.low {
-        background: linear-gradient(to top, #ff3b3b, #ff6b6b);
-    }
-
-.bar-label {
-        margin-top: 8px;
-        font-size: 14px;
-        color: #aaa;
-    }
-
-.bar-value {
-        position: absolute;
-        top: -25px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-weight: 700;
-        font-size: 16px;
-        white-space: nowrap;
-    }
-
-.min-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: #ff3b3b;
-        box-shadow: 0 0 10px rgba(255,59,59,0.8);
-    }
-
-.min-line::after {
-        content: 'MIN';
-        position: absolute;
-        right: -45px;
-        top: -10px;
-        font-size: 12px;
-        color: #ff3b3b;
-        font-weight: 700;
-    }
-
-.card-status {
-        text-align: center;
-        padding: 15px 40px;
-        border-radius: 50px;
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0 auto;
-        width: fit-content;
-    }
-.card-status.ok { background: rgba(0,255,136,0.2); color: #00ff88; }
-.card-status.low { background: rgba(255,59,59,0.2); color: #ff3b3b; }
-
-.empty-state {
-        text-align: center;
-        font-size: 24px;
-        color: #666;
-        padding: 60px;
-        width: 100%;
-    }
-
-.hidden { display: none!important; }
-</style>
+        .admin-form { background: var(--card-bg); padding: 40px; border-radius: 20px; border: 1px solid var(--primary); width: 420px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; box-sizing: border-box; }
+    </style>
 </head>
 <body>
 
-<video id="bgVideo" autoplay muted loop>
-    <source src="https://assets.mixkit.co/videos/preview/mixkit-futuristic-corridor-with-neon-lights-34565-large.mp4" type="video/mp4">
-</video>
-<div class="overlay"></div>
+    <video autoplay muted loop id="video-bg">
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-abstract-technology-server-room-background-31714-large.mp4" type="video/mp4">
+    </video>
 
-<div class="logo">KEMMSOFT STOCK 8V</div>
-
-<div class="voice-panel">
-    <div class="mic-indicator" id="micIndicator">🎤</div>
-    <div class="voice-text" id="voiceText">Inicializuji systém...</div>
-    <div class="voice-help">Řekněte "Hej KEMMSOFT" pro aktivaci</div>
-</div>
-
-<div id="overview" class="page active">
-    <div class="train-container" id="trainContainer">
-        <div class="empty-state">Sklad je prázdný. Řekněte "Přidat položku" pro přidání.</div>
+    <div class="header-ui">
+        <div class="brand">KEMMSOFT STOCK 8V</div>
+        <div class="voice-status">
+            <div class="pulse-mic" id="mic-indicator"></div>
+            <span id="status-text">Hlasový asistent připraven (Řekněte "KEMSOFT")</span>
+        </div>
+        <nav>
+            <button onclick="showSection('overview')">Přehled (TV)</button>
+            <button onclick="showSection('inventory')">Obsah skladu</button>
+            <button onclick="showSection('admin')">Admin</button>
+        </nav>
     </div>
-</div>
 
-<script>
-    let items = JSON.parse(localStorage.getItem('stockItems') || '[]');
-    let recognition;
-    let isListening = false;
-    let currentItem = null;
-    let voiceState = 'idle';
-    let pendingAction = null;
-    let czechVoice = null;
-    let wakeWordActive = false;
+    <div id="voice-dialog" class="section">
+        <div id="voice-overlay">
+            <h1 id="voice-prompt" style="color: var(--primary); font-size: 2.5rem;">Naslouchám...</h1>
+            <div id="voice-card-showcase"></div>
+            <div class="speech-preview" id="speech-preview">Pro mluvení počkejte na pípnutí/výzvu.</div>
+        </div>
+    </div>
 
-    // Načti český hlas
-    function loadVoices() {
-        const voices = speechSynthesis.getVoices();
-        czechVoice = voices.find(v => v.lang === 'cs-CZ' && v.name.includes('Google')) ||
-                     voices.find(v => v.lang === 'cs-CZ' && v.name.includes('Microsoft')) ||
-                     voices.find(v => v.lang === 'cs-CZ') ||
-                     voices.find(v => v.lang.startsWith('cs')) ||
-                     voices[0];
-        console.log('Použitý hlas:', czechVoice?.name);
-    }
+    <div id="overview" class="section active">
+        <div id="carousel-viewport"><div id="carousel-track"></div></div>
+        <div class="critical-bar"><div class="ticker-wrap" id="ticker-content"></div></div>
+    </div>
 
-    speechSynthesis.onvoiceschanged = loadVoices;
-    loadVoices();
+    <div id="inventory" class="section">
+        <div class="inventory-container">
+            <h1>Skladová evidence</h1>
+            <table>
+                <thead><tr><th>ID</th><th>Název</th><th>Skladem</th><th>Minimum</th><th>Status</th></tr></thead>
+                <tbody id="inventory-list"></tbody>
+            </table>
+        </div>
+    </div>
 
-    // Inicializace rozpoznávání řeči
-    function initSpeechRecognition() {
-        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-            updateVoiceText('Prohlížeč nepodporuje hlas. Použijte Chrome nebo Edge.');
-            return false;
-        }
+    <div id="admin" class="section">
+        <div class="admin-form">
+            <h2>Nový díl (Základní registrace)</h2>
+            <input type="text" id="itemNum" placeholder="Katalogové číslo (ID)">
+            <input type="text" id="itemName" placeholder="Název náhradního dílu">
+            <input type="number" id="itemCount" placeholder="Počet kusů">
+            <input type="number" id="itemMin" placeholder="Minimální zásoba">
+            <button onclick="addItem()" style="width: 100%; margin-top: 10px; background: var(--primary); color: black;">ULOŽIT</button>
+        </div>
+    </div>
+
+    <script>
+        let stock = JSON.parse(localStorage.getItem('k_stock_voice_v1')) || [
+            { id: "101", name: "Senzor tlaku", count: 12, min: 5, isKey: false },
+            { id: "102", name: "Servomotor 8V", count: 2, min: 3, isKey: true }
+        ];
+        let pos = 0;
+        let animationFrame;
+        
+        // Hlasové řízení - stavový automat
+        let voiceState = "IDLE"; 
+        let currentAction = null; // "naskladnit" nebo "vyskladnit"
+        let targetItem = null;
+        let targetQty = 0;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
+        const recognition = new SpeechRecognition();
         recognition.lang = 'cs-CZ';
         recognition.continuous = true;
         recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
 
-        recognition.onstart = () => {
-            console.log('Poslouchám...');
-            isListening = true;
-        };
-
-        recognition.onresult = (event) => {
-            const last = event.results.length - 1;
-            const transcript = event.results[last][0].transcript.toLowerCase().trim();
-            console.log('Rozpoznáno:', transcript);
-            handleVoiceCommand(transcript);
-        };
-
-        recognition.onerror = (event) => {
-            console.error('Speech error:', event.error);
-            if (event.error === 'not-allowed') {
-                updateVoiceText('Mikrofon blokován. Povolte přístup k mikrofonu.');
-                speak('Nemám přístup k mikrofonu. Povolte ho prosím v nastavení prohlížeče.');
-            } else if (event.error === 'no-speech') {
-                // Ignoruj, pokračuj v poslechu
-            } else if (event.error === 'network') {
-                updateVoiceText('Chyba sítě. Zkontrolujte připojení.');
-            }
-        };
-
-        recognition.onend = () => {
-            isListening = false;
-            if (wakeWordActive) {
-                // Restartuj poslech pro wake word
-                setTimeout(() => {
-                    if (wakeWordActive) startListening();
-                }, 100);
-            }
-        };
-
-        return true;
-    }
-
-    function speak(text, callback) {
-        updateVoiceText(text, 'speaking');
-        speechSynthesis.cancel();
-
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'cs-CZ';
-        utterance.voice = czechVoice;
-        utterance.rate = 0.95;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-
-        utterance.onend = () => {
-            updateVoiceText('Poslouchám...', 'listening');
-            if (callback) callback();
-        };
-        utterance.onerror = (e) => {
-            console.error('TTS error:', e);
-            if (callback) callback();
-        };
-
-        speechSynthesis.speak(utterance);
-    }
-
-    function updateVoiceText(text, type = '') {
-        const el = document.getElementById('voiceText');
-        const indicator = document.getElementById('micIndicator');
-        el.textContent = text;
-        el.className = 'voice-text ' + type;
-        indicator.className = 'mic-indicator ' + type;
-    }
-
-    function startListening() {
-        if (!recognition) return;
-        try {
-            recognition.start();
-        } catch (e) {
-            console.error('Start error:', e);
-        }
-    }
-
-    function stopListening() {
-        if (recognition) {
-            recognition.stop();
-        }
-        isListening = false;
-        wakeWordActive = false;
-        voiceState = 'idle';
-        currentItem = null;
-        pendingAction = null;
-    }
-
-    function handleVoiceCommand(transcript) {
-        // Wake word
-        if (transcript.includes('hej kemmsoft') || transcript.includes('hej kemsoft') ||
-            transcript.includes('hey kemmsoft') || transcript.includes('kemmsoft')) {
-            if (!wakeWordActive) {
-                wakeWordActive = true;
-                voiceState = 'waiting_search';
-                speak('Jsem KEMMSOFT STOCK 8V, řekněte mi co mám vyhledat');
-            }
-            return;
+        function speak(text, callback) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'cs-CZ';
+            utterance.onend = () => { if (callback) callback(); };
+            window.speechSynthesis.speak(utterance);
         }
 
-        if (!wakeWordActive) return;
-
-        if (voiceState === 'waiting_search') {
-            if (transcript.includes('přidat položku') || transcript.includes('nová položka')) {
-                speak('Funkce přidání položky hlasem bude doplněna. Zatím použijte administrátorské rozhraní.');
-                voiceState = 'idle';
-                wakeWordActive = false;
+        recognition.onresult = function(event) {
+            const result = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+            document.getElementById('speech-preview').innerText = `Slyšel jsem: "${result}"`;
+            
+            // Globální příkaz pro ukončení
+            if (result.includes("konec")) {
+                speak("Ukončuji operaci.", () => { resetVoiceSystem(); });
                 return;
             }
-            searchItem(transcript);
-        } else if (voiceState === 'waiting_action') {
-            if (transcript.includes('naskladnit') || transcript.includes('přidat') || transcript.includes('přičti')) {
-                pendingAction = 'in';
-                speak('Kolik kusů mám naskladnit?');
-                voiceState = 'waiting_quantity';
-            } else if (transcript.includes('vyskladnit') || transcript.includes('odebrat') || transcript.includes('vydat') || transcript.includes('odečti')) {
-                pendingAction = 'out';
-                speak('Kolik kusů mám vyskladnit?');
-                voiceState = 'waiting_quantity';
-            } else if (transcript.includes('ne') || transcript.includes('nic') || transcript.includes('konec') || transcript.includes('zrušit')) {
-                speak('Rozumím. Ukončuji.');
-                voiceState = 'idle';
-                wakeWordActive = false;
+
+            switch(voiceState) {
+                case "IDLE":
+                    if (result.includes("kemsoft") || result.includes("kemmsoft")) {
+                        voiceState = "ACTION_CHOOSE";
+                        document.getElementById('mic-indicator').classList.add('listening');
+                        document.getElementById('status-text').innerText = "Systém KEMSOFT aktivní";
+                        showSection('voice-dialog');
+                        document.getElementById('voice-overlay').style.display = 'block';
+                        document.getElementById('voice-prompt').innerText = "Chcete naskladnit nebo vyskladnit?";
+                        speak("Chcete naskladnit nebo vyskladnit?");
+                    }
+                    break;
+
+                case "ACTION_CHOOSE":
+                    if (result.includes("naskladnit")) {
+                        currentAction = "IN";
+                        goToGetItem();
+                    } else if (result.includes("vyskladnit")) {
+                        currentAction = "OUT";
+                        goToGetItem();
+                    } else {
+                        speak("Nerozuměla jsem. Řekněte naskladnit nebo vyskladnit.");
+                    }
+                    break;
+
+                case "ITEM_CHOOSE":
+                    // Hledání podle názvu v databázi
+                    let found = stock.find(item => result.includes(item.name.toLowerCase()) || result.includes(item.id));
+                    if (found) {
+                        targetItem = found;
+                        voiceState = "QTY_CHOOSE";
+                        let promptText = currentAction === "IN" ? "Jaké množství přidáte?" : "Jaké množství odeberete?";
+                        document.getElementById('voice-prompt').innerText = promptText;
+                        speak(promptText);
+                    } else {
+                        speak("Tuto položku nemám v evidenci. Zkuste to znovu.");
+                    }
+                    break;
+
+                case "QTY_CHOOSE":
+                    // Extrakce čísla z textu
+                    let match = result.match(/\d+/);
+                    if (match) {
+                        targetQty = parseInt(match[0]);
+                        executeVoiceTransaction();
+                    } else {
+                        speak("Zadejte množství číslem.");
+                    }
+                    break;
+            }
+        };
+
+        function goToGetItem() {
+            voiceState = "ITEM_CHOOSE";
+            document.getElementById('voice-prompt').innerText = "Jakou položku?";
+            speak("Jakou položku?");
+        }
+
+        function executeVoiceTransaction() {
+            let oldQty = targetItem.count;
+            if (currentAction === "IN") {
+                targetItem.count += targetQty;
             } else {
-                speak('Nerozuměl jsem. Chcete naskladnit nebo vyskladnit?');
+                if(targetQty > targetItem.count) {
+                    speak("Chyba. Na skladě není dostatek kusů.");
+                    resetVoiceSystem();
+                    return;
+                }
+                targetItem.count -= targetQty;
             }
-        } else if (voiceState === 'waiting_quantity') {
-            const number = extractNumber(transcript);
-            if (number!== null && number > 0) {
-                processQuantity(number);
-            } else {
-                speak('Nerozuměl jsem počtu. Řekněte číslo.');
-            }
-        }
-    }
 
-    function extractNumber(text) {
-        const match = text.match(/\d+/);
-        return match? parseInt(match[0]) : null;
-    }
+            // Uložení dat
+            localStorage.setItem('k_stock_voice_v1', JSON.stringify(stock));
 
-    function searchItem(query) {
-        const found = items.filter(item =>
-            item.name.toLowerCase().includes(query) ||
-            item.number.toLowerCase().includes(query)
-        );
-
-        if (found.length === 0) {
-            speak(`Položku ${query} jsem nenašel na skladě.`);
-            voiceState = 'idle';
-            wakeWordActive = false;
-            return;
-        }
-
-        currentItem = found[0];
-        const stav = currentItem.qty >= currentItem.min? 'dostatečná zásoba' : 'pod minimem';
-
-        document.querySelector('.train-track')?.classList.add('paused');
-        highlightCard(currentItem.id);
-
-        speak(`Našel jsem ${currentItem.name}. Aktuálně ${currentItem.qty} kusů, ${stav}. Chcete naskladnit nebo vyskladnit?`);
-        voiceState = 'waiting_action';
-    }
-
-    function processQuantity(qty) {
-        if (!currentItem) return;
-
-        if (pendingAction === 'in') {
-            currentItem.qty += qty;
-            speak(`Naskladněno ${qty} kusů. Nový stav ${currentItem.qty} kusů.`);
-            saveItems();
-            updateCardVisual(currentItem.id);
-        } else if (pendingAction === 'out') {
-            if (qty > currentItem.qty) {
-                speak(`Nelze vyskladnit ${qty} kusů. Na skladě je pouze ${currentItem.qty} kusů.`);
-                voiceState = 'idle';
-                wakeWordActive = false;
-                return;
-            }
-            currentItem.qty -= qty;
-            speak(`Vyskladněno ${qty} kusů. Zbývá ${currentItem.qty} kusů na skladě.`);
-            saveItems();
-            updateCardVisual(currentItem.id);
-        }
-        voiceState = 'idle';
-        wakeWordActive = false;
-        setTimeout(() => {
-            document.querySelector('.train-track')?.classList.remove('paused');
-        }, 2000);
-    }
-
-    function highlightCard(itemId) {
-        document.querySelectorAll('.train-card').forEach(card => {
-            card.classList.remove('focused');
-        });
-        const card = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (card) {
-            card.classList.add('focused');
-        }
-    }
-
-    function updateCardVisual(itemId) {
-        const card = document.querySelector(`[data-item-id="${itemId}"]`);
-        if (card) {
-            card.classList.add('updated');
-            setTimeout(() => card.classList.remove('updated'), 800);
-        }
-        renderTrain();
-    }
-
-    function saveItems() {
-        localStorage.setItem('stockItems', JSON.stringify(items));
-        renderTrain();
-    }
-
-    function renderTrain() {
-        const container = document.getElementById('trainContainer');
-
-        if (items.length === 0) {
-            container.innerHTML = '<div class="empty-state">Sklad je prázdný. Řekněte "Hej KEMMSOFT" a pak "Přidat položku".</div>';
-            return;
-        }
-
-        const allItems = [...items,...items];
-        const maxValue = Math.max(...items.map(i => Math.max(i.qty, i.min, 1))) * 1.2;
-
-        container.innerHTML = `
-            <div class="train-track">
-                ${allItems.map(item => {
-                    const qtyPercent = (item.qty / maxValue) * 100;
-                    const minPercent = (item.min / maxValue) * 100;
-                    const isLow = item.qty < item.min;
-
-                    return `
-                    <div class="train-card ${isLow? 'low-stock' : ''}" data-item-id="${item.id}">
-                        <div class="card-header">
-                            <div class="card-title">${item.name}</div>
-                            <div class="card-number">#${item.number}</div>
-                        </div>
-
-                        <div class="card-stats">
-                            <div class="stat-box">
-                                <div class="stat-value ${isLow? 'low' : 'ok'}">${item.qty}</div>
-                                <div class="stat-label">SKLADEM</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-value" style="color: #888;">${item.min}</div>
-                                <div class="stat-label">MINIMUM</div>
-                            </div>
-                        </div>
-
-                        <div class="stock-chart">
-                            <div class="min-line" style="bottom: ${minPercent}%;"></div>
-                            <div class="chart-bars">
-                                <div class="bar-wrapper">
-                                    <div class="bar ${isLow? 'low' : ''}" style="height: ${qtyPercent}%;">
-                                        <div class="bar-value">${item.qty} ks</div>
-                                    </div>
-                                    <div class="bar-label">Aktuální stav</div>
-                                </div>
-                                <div class="bar-wrapper">
-                                    <div class="bar" style="height: ${minPercent}%; background: rgba(255,59,59,0.3);">
-                                        <div class="bar-value">${item.min} ks</div>
-                                    </div>
-                                    <div class="bar-label">Min. zásoba</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-status ${item.qty >= item.min? 'ok' : 'low'}">
-                            ${item.qty >= item.min? '✓ SKLADEM' : '⚠ DOPLNIT'}
-                        </div>
+            // Zobrazení výsledné karty na displeji
+            const critical = targetItem.count <= targetItem.min;
+            document.getElementById('voice-prompt').innerText = "Transakce dokončena";
+            document.getElementById('voice-card-showcase').innerHTML = `
+                <div class="card ${critical ? 'is-critical' : ''}" style="margin: 30px auto; float:none;">
+                    <h2>ID: ${targetItem.id} - ${targetItem.name}</h2>
+                    <div class="stock-val">${targetItem.count} <small style="font-size:1.5rem">ks</small></div>
+                    <div class="delta-val" style="color: ${currentAction === 'IN' ? '#2ecc71' : 'var(--danger)'}">
+                        ${currentAction === 'IN' ? '▲ Přidáno' : '▼ Odebráno'}: ${targetQty} ks (Původně: ${oldQty} ks)
                     </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    }
+                </div>
+            `;
 
-    // Init
-    window.addEventListener('load', () => {
-        renderTrain();
-        if (initSpeechRecognition()) {
-            setTimeout(() => {
-                updateVoiceText('Systém připraven. Řekněte "Hej KEMMSOFT"');
-                wakeWordActive = true;
-                startListening();
-            }, 1000);
+            speak(`Položka ${targetItem.name} aktualizována na ${targetItem.count} kusů. Pro ukončení řekněte konec.`);
         }
-    });
-</script>
+
+        function resetVoiceSystem() {
+            voiceState = "IDLE";
+            currentAction = null;
+            targetItem = null;
+            targetQty = 0;
+            document.getElementById('mic-indicator').classList.remove('listening');
+            document.getElementById('status-text').innerText = 'Hlasový asistent připraven (Řekněte "KEMSOFT")';
+            document.getElementById('voice-card-showcase').innerHTML = '';
+            document.getElementById('speech-preview').innerText = '';
+            showSection('overview');
+        }
+
+        // Restart mikrofonu v případě odpojení
+        recognition.onend = function() { recognition.start(); };
+
+        // Původní aplikační logika
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            cancelAnimationFrame(animationFrame);
+            if (id === 'overview') initCarousel();
+            else if (id === 'inventory') renderTable();
+            updateTicker();
+        }
+
+        function addItem() {
+            const id = document.getElementById('itemNum').value.trim();
+            const name = document.getElementById('itemName').value.trim();
+            const count = parseInt(document.getElementById('itemCount').value);
+            const min = parseInt(document.getElementById('itemMin').value);
+            if (!id || isNaN(count)) return alert('Zadejte data!');
+            stock.push({ id, name: name || "Díl X", count, min: min || 0 });
+            localStorage.setItem('k_stock_voice_v1', JSON.stringify(stock));
+            alert('Uloženo!');
+        }
+
+        function renderTable() {
+            document.getElementById('inventory-list').innerHTML = stock.map(item => `
+                <tr style="color: ${item.count <= item.min ? 'var(--danger)' : 'white'}">
+                    <td>${item.id}</td><td>${item.name}</td><td><strong>${item.count} ks</strong></td><td>${item.min} ks</td><td>${item.count <= item.min ? '⚠️ DOPLNIT' : '✅ OK'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function initCarousel() {
+            const track = document.getElementById('carousel-track');
+            if (stock.length === 0) return;
+            const fullList = [...stock, ...stock, ...stock];
+            track.innerHTML = fullList.map(item => `
+                <div class="card ${item.count <= item.min ? 'is-critical' : ''}">
+                    <div style="display:flex; justify-content:space-between; color:var(--primary)"><span>ID: ${item.id}</span></div>
+                    <h1 style="margin: 20px 0;">${item.name}</h1>
+                    <div class="stock-val">${item.count} <small style="font-size: 1.5rem">ks</small></div>
+                    <p>Minimum: ${item.min} ks</p>
+                </div>
+            `).join('');
+            pos = 0;
+            animate();
+        }
+
+        function animate() {
+            const track = document.getElementById('carousel-track');
+            const cardWidth = 500 + 60; 
+            const resetPoint = cardWidth * stock.length;
+            pos -= 1.2; 
+            if (Math.abs(pos) >= resetPoint) pos = 0;
+            if(track) track.style.transform = `translateX(${pos}px)`;
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        function updateTicker() {
+            const criticals = stock.filter(i => i.count <= i.min);
+            document.getElementById('ticker-content').innerHTML = criticals.length > 0 ? 
+                "⚠️ NEDOSTATEK ZÁSOB: " + criticals.map(i => `${i.name} (${i.count}ks)`).join(" +++ ") : "VŠECHNY POLOŽKY V NORMĚ • KEMMSOFT 8V";
+        }
+
+        // Spuštění hlasového engine na pozadí při startu
+        window.onload = () => {
+            initCarousel();
+            try {
+                recognition.start();
+            } catch(e) {
+                console.log("Mikrofon už běží.");
+            }
+        };
+    </script>
 </body>
 </html>
