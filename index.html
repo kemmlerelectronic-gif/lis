@@ -1,407 +1,901 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KEMMSOFT 8V - Voice Controlled Final</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #00d4ff;
-            --danger: #ff4d4d;
-            --warning: #ffcc00;
-            --bg-dark: rgba(0, 0, 0, 0.95);
-            --card-bg: rgba(20, 20, 20, 0.9);
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEMMSOFT 4.0 Testing</title>
 
-        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; color: white; overflow: hidden; height: 100vh; background: #000; }
-        #video-bg { position: fixed; right: 0; bottom: 0; min-width: 100%; min-height: 100%; z-index: -1; filter: brightness(15%); }
+<style>
+/* Základní styly */
+body{
+font-family: 'Segoe UI', Arial, sans-serif; 
+background:url("background.png") center/cover fixed; 
+margin:0;
+color:white;
+overflow-x: hidden; 
+}
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.4);
+z-index:-1;
+}
+.topbarContainer{ 
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:15px 25px;
+background: rgba(0, 0, 0, 0.6); 
+box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+transition: all 0.3s ease; 
+gap: 20px;
+}
+.topbarContainer.hidden { 
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none; 
+    display: none !important; /* Kompletní skrytí lišty */
+}
 
-        .header-ui { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 20px; z-index: 1000; box-sizing: border-box; }
-        .brand { font-size: 1.8rem; font-weight: 900; color: var(--primary); letter-spacing: 3px; }
-        
-        .voice-status { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1rem; }
-        .pulse-mic { width: 12px; height: 12px; background: #555; border-radius: 50%; transition: 0.3s; }
-        .pulse-mic.ready { background: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
-        .pulse-mic.listening { animation: mic-glow 1s infinite; background: var(--danger); }
-        @keyframes mic-glow { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,77,0.7); } 70% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(255,77,77,0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,77,77,0); } }
+.kemmsTop { 
+    font-size: 38px; 
+    font-weight: 900; 
+    background: linear-gradient(45deg, #22c55e, #34d399); 
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 15px rgba(34, 197, 94, 0.8), 0 0 25px rgba(52, 211, 153, 0.6); 
+    letter-spacing: 1px; 
+    transition: all 0.3s ease;
+    animation: logoPulse 4s infinite alternate ease-in-out;
+    white-space: nowrap;
+}
+@keyframes logoPulse {
+    0% { text-shadow: 0 0 15px rgba(34, 197, 94, 0.8), 0 0 25px rgba(52, 211, 153, 0.6); }
+    50% { text-shadow: 0 0 8px rgba(22, 101, 52, 0.7); }
+    100% { text-shadow: 0 0 15px rgba(34, 197, 94, 0.8), 0 0 25px rgba(52, 211, 153, 0.6); }
+}
 
-        nav { display: flex; gap: 10px; margin-right: 40px; }
-        button { background: rgba(0,0,0,0.7); border: 1px solid var(--primary); color: white; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+/* ROLUJÍCÍ VZKAZY V TOPBARU */
+.vzkazTickerContainer {
+    flex-grow: 1;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.4);
+    border-left: 3px solid #22c55e;
+    border-right: 3px solid #22c55e;
+    padding: 8px 10px;
+    margin: 0 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+.vzkazTicker {
+    white-space: nowrap;
+    display: inline-block;
+    font-size: 22px;
+    font-weight: bold;
+    color: #fef08a; 
+    text-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
+    animation: tickerLoop 30s linear infinite;
+    padding-left: 100%;
+}
+@keyframes tickerLoop {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-100%, 0, 0); }
+}
 
-        .section { display: none; height: 100vh; width: 100%; justify-content: center; align-items: center; flex-direction: column; }
-        .active { display: flex; }
+.topbar {
+    white-space: nowrap;
+}
+.topbar button{ 
+padding:12px 22px; 
+margin-left:10px; 
+border:none;
+border-radius:8px; 
+background: linear-gradient(135deg, #22c55e, #1a9a4e); 
+color:white;
+cursor:pointer;
+font-size: 1.1em; 
+font-weight: 600; 
+box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); 
+transition: all 0.3s ease; 
+position: relative;
+overflow: hidden; 
+}
+.topbar button::before { 
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: skewX(-30deg);
+    transition: all 0.5s ease;
+}
+.topbar button:hover::before { left: 100%; }
+.topbar button:hover {
+    background: linear-gradient(135deg, #1a9a4e, #22c55e); 
+    transform: translateY(-3px) scale(1.02); 
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.6); 
+}
+.topbar button.active-nav {
+    background: linear-gradient(135deg, #0f4f2c, #166534); 
+    box-shadow: 0 2px 10px rgba(34, 197, 94, 0.8), inset 0 0 8px rgba(34, 197, 94, 0.6);
+    transform: translateY(0);
+    border: 1px solid #22c55e;
+}
 
-        #voice-dialog { z-index: 1500; background: rgba(0,0,0,0.4); }
-        #voice-overlay { background: rgba(10, 10, 10, 0.95); border: 3px dashed var(--primary); padding: 40px; border-radius: 20px; text-align: center; min-width: 550px; max-width: 700px; box-shadow: 0 0 60px rgba(0,212,255,0.4); }
-        .speech-preview { font-style: italic; color: #666; margin-top: 20px; min-height: 24px; font-size: 1.1rem; border-top: 1px solid #222; padding-top: 15px; }
+.header{
+text-align:center;
+font-size:68px; 
+background:#111827cc;
+padding:10px;
+transition: all 0.3s ease;
+text-shadow: 2px 2px 8px rgba(0,0,0,0.7); 
+border-bottom: 2px solid rgba(34, 197, 94, 0.5); 
+min-height: 100px; 
+display: flex; 
+align-items: center;
+justify-content: center;
+}
+@keyframes headerBlink {
+  0%, 100% { color: #22c55e; text-shadow: 0 0 15px #22c55e; }
+  50% { color: #ffffff; text-shadow: none; }
+}
+.header.blink { animation: headerBlink 1s infinite; } 
 
-        /* --- CAROUSEL --- */
-        #carousel-viewport { width: 100%; overflow: hidden; position: relative; height: 500px; }
-        #carousel-track { display: flex; gap: 60px; position: absolute; left: 0; will-change: transform; align-items: center; }
-        
-        .card { min-width: 500px; background: var(--card-bg); padding: 40px; border-radius: 20px; border: 2px solid var(--primary); box-shadow: 0 20px 40px rgba(0,0,0,0.8); flex-shrink: 0; position: relative; box-sizing: border-box; }
-        .card.is-key { border-color: var(--warning); }
-        .card.is-key::before { content: "⭐ KLÍČOVÝ DÍL"; position: absolute; top: -15px; left: 20px; background: var(--warning); color: black; padding: 2px 15px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
-        .card.is-critical { border-color: var(--danger); background: rgba(60, 0, 0, 0.9); box-shadow: 0 0 50px rgba(255, 77, 77, 0.4); }
-        
-        .stock-val { font-size: 5rem; font-weight: 900; }
-        .delta-val { font-size: 1.6rem; margin-top: 15px; font-weight: bold; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; }
+.layout{
+display:grid;
+grid-template-columns:4fr 1.3fr;
+gap:20px;
+padding:20px;
+}
+.rowTop{ display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:20px; }
+.rowBottom{ display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
 
-        /* --- EVIDENCE & TICKER --- */
-        .inventory-container { width: 85%; max-height: 70vh; overflow-y: auto; background: var(--card-bg); padding: 30px; border-radius: 15px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; color: var(--primary); padding: 15px; border-bottom: 2px solid var(--primary); }
-        td { padding: 15px; border-bottom: 1px solid #222; }
-        
-        .critical-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: var(--danger); color: white; padding: 12px 0; font-weight: bold; overflow: hidden; z-index: 10; }
-        .ticker-wrap { display: inline-block; animation: ticker-move 30s linear infinite; white-space: nowrap; }
-        @keyframes ticker-move { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
+.card{
+background: linear-gradient(145deg, #020617ee, #111827ee); 
+padding:25px;
+border-radius:22px; 
+text-align:center;
+transition: all .4s ease-out; 
+position: relative;
+box-shadow: 0 8px 20px rgba(0,0,0,0.7), inset 0 0 10px rgba(255,255,255,0.05); 
+border: 1px solid rgba(34, 197, 94, 0.15); 
+}
 
-        .admin-form { background: var(--card-bg); padding: 40px; border-radius: 20px; border: 1px solid var(--primary); width: 420px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; background: rgba(255,255,255,0.05); border: 1px solid #444; color: white; box-sizing: border-box; }
-    </style>
+.card.assigned{
+background: linear-gradient(145deg, #16653499, #1a9a4e99); 
+color: #e0ffe0; 
+box-shadow: 0 0 30px rgba(34, 197, 94, 0.7), inset 0 0 15px rgba(34, 197, 94, 0.5); 
+border-color: #22c55e;
+animation: pulseBorder 2s infinite ease-in-out; 
+}
+@keyframes pulseBorder {
+    0% { border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 0 30px rgba(34, 197, 94, 0.7), inset 0 0 15px rgba(34, 197, 94, 0.5); }
+    50% { border-color: rgba(34, 197, 94, 0.9); box-shadow: 0 0 45px rgba(34, 197, 94, 0.9), inset 0 0 20px rgba(34, 197, 94, 0.7); }
+    100% { border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 0 30px rgba(34, 197, 94, 0.7), inset 0 0 15px rgba(34, 197, 94, 0.5); }
+}
+
+.card.active{ 
+background: linear-gradient(145deg, #22c55e, #1a9a4e); 
+color: #000; 
+box-shadow: 0 0 80px rgba(34, 197, 94, 0.9), 0 0 30px rgba(255,255,255,0.6); 
+transform: scale(1.08); 
+border-color: #22c55e;
+animation: cardActiveScale 1.2s forwards; 
+}
+@keyframes cardActiveScale {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1.08); }
+}
+
+.lis {
+    font-size: 40px; 
+    font-weight: 900; 
+    background: linear-gradient(45deg, #6ee7b7, #34d399); 
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 6px 6px 12px rgba(0,0,0,0.8), 8px 8px 16px rgba(0,0,0,0.7);
+    margin-bottom: 25px; 
+}
+
+.card .kontakt{font-size:38px;color:#22d3ee; margin-top: 20px; font-weight: 800;} 
+.card .prurez{font-size:40px;color:#fbbf24; margin-top: 15px; font-weight: 700;} 
+.card .jmeno{font-size:38px;color:#cbd5f5; margin-top: 15px; font-weight: 700;} 
+.card .time{font-size:24px;color:#cbd5f5;margin-top:15px; font-weight: 500;} 
+
+.hotovo{ 
+margin-top:15px;
+padding:8px 18px;
+border:none;
+border-radius:8px;
+background:#ef4444;
+color:white;
+cursor:pointer;
+box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
+transition: all 0.3s ease;
+}
+.hotovo:hover { background: #dc2626; transform: translateY(-2px); }
+
+.queue{
+background: linear-gradient(145deg, #020617ee, #111827ee); 
+padding:20px;
+border-radius:22px;
+max-height:80vh;
+overflow-y:auto;
+box-shadow: 0 8px 20px rgba(0,0,0,0.7), inset 0 0 10px rgba(255,255,255,0.05);
+border: 1px solid rgba(34, 197, 94, 0.15);
+box-sizing: border-box;
+}
+/* Úprava pro Výrobní obrazovku */
+#productionScreen .queue {
+    padding-bottom: 200px; 
+}
+
+.queue h3, .queueTitle { 
+    color: #22c55e;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+    margin-bottom: 15px;
+    font-size: 1.8em; 
+}
+
+/* SEKCE PRO VZKAZY */
+.vzkazSection {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 2px dashed rgba(34, 197, 94, 0.3);
+}
+.vzkazyList {
+    margin-top: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 5px;
+}
+.vzkazItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e293b77;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    border-left: 3px solid #eab308;
+}
+.vzkazItem span {
+    color: #fef08a;
+    word-break: break-all;
+    padding-right: 10px;
+}
+.vzkazItem small {
+    color: #94a3b8;
+    font-size: 0.75em;
+    display: block;
+}
+.vzkazItem button {
+    background: #ef4444;
+    border: none;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+.vzkazItem button:hover { background: #dc2626; }
+
+/* SEKCE PRO QR KÓD (NASTAVENÍ) */
+.qrSection {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 2px dashed rgba(34, 197, 94, 0.3);
+    text-align: center;
+}
+.qrContainer {
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    display: inline-block;
+    margin-top: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.qrContainer img {
+    display: block;
+    width: 150px;
+    height: 150px;
+}
+
+/* ROŽNÍ FIXNÍ QR KÓD PRO VÝROBNÍ OBRAZOVKU */
+.production-fixed-qr {
+    position: fixed;
+    bottom: 35px;
+    right: 45px;
+    z-index: 999;
+    background: white;
+    padding: 12px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 15px rgba(34, 197, 94, 0.4);
+    border: 2px solid #22c55e;
+    display: none; 
+}
+.production-fixed-qr img {
+    display: block;
+    width: 140px;
+    height: 140px;
+}
+
+.queueItem{
+padding:15px; 
+border-bottom:1px solid #1e293b;
+margin-bottom:12px; 
+position: relative;
+background: #020617aa; 
+border-radius: 8px;
+box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+font-size: 1.3em; 
+transition: all 0.3s ease-in-out; 
+}
+.queueItem b { color: #22d3ee; font-size: 1.1em;} 
+.queueItem .time { color: #cbd5f5; font-size: 0.9em; margin-top: 5px;} 
+
+.queueItem.new-request-pulse { animation: newRequestPulse 4s forwards ease-in-out; }
+@keyframes newRequestPulse {
+    0% { background: linear-gradient(145deg, #FFD700, #FFECB3); transform: scale(1.05); color: #333; }
+    50% { background: linear-gradient(145deg, #FFECB3, #FFD700); transform: scale(1.08); color: #000; }
+    100% { background: #020617aa; transform: scale(1); color: white; }
+}
+
+.assign button{ 
+margin:2px;
+padding:6px 10px;
+border:none;
+border-radius:6px;
+background:#22c55e;
+color:white;
+cursor:pointer;
+transition: background 0.2s ease, transform 0.1s ease;
+}
+.assign button:hover { background: #1a9a4e; transform: translateY(-1px); }
+.assign .deleteBtn{ background:#ef4444; }
+.assign .deleteBtn:hover { background: #dc2626; }
+
+input{ 
+width:100%;
+padding:10px;
+margin-bottom:10px;
+border-radius:8px;
+border:1px solid #1e293b;
+background: #0f172a;
+color: white;
+box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+box-sizing: border-box;
+}
+.addBtn{ 
+width:100%;
+padding:12px;
+background: linear-gradient(90deg, #3b82f6, #60a5fa); 
+border:none;
+border-radius:8px;
+color:white;
+cursor:pointer;
+font-size: 1.1em;
+font-weight: bold;
+box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+transition: all 0.3s ease;
+margin-bottom: 10px;
+}
+.addBtn:hover { 
+    background: linear-gradient(90deg, #60a5fa, #3b82f6);
+    transform: translateY(-2px);
+}
+.vzkazBtn {
+    background: linear-gradient(90deg, #eab308, #ca8a04);
+    box-shadow: 0 4px 10px rgba(234, 179, 8, 0.3);
+}
+.vzkazBtn:hover { background: linear-gradient(90deg, #ca8a04, #eab308); }
+
+#requestsScreen{ 
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height: calc(100vh - 50px);
+}
+#requestsScreen > div { 
+    max-width: 90%; 
+    width: 400px; 
+    margin: 20px auto; 
+    padding: 25px; 
+    background: linear-gradient(145deg, #020617ee, #111827ee);
+    border-radius: 22px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+    border: 2px solid rgba(34, 197, 94, 0.5);
+}
+#requestsScreen h3 { 
+    color: #22c55e;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+    margin-bottom: 30px; 
+    font-size: 2.2em; 
+}
+
+@media screen and (max-width: 600px) {
+    #requestsScreen > div { width: 95%; padding: 30px; margin: 10px auto; }
+    #requestsScreen h3 { font-size: 2.5em; margin-bottom: 25px; }
+    input { padding: 15px; font-size: 1.1em; }
+    .addBtn { padding: 15px; font-size: 1.2em; }
+}
+
+.production{display:none} 
+.blink{animation:blinkAnim 1s infinite;}
+@keyframes blinkAnim{
+0%{background:#22c55e}
+50%{background:#111827}
+100%{background:#22c55e}
+}
+</style>
 </head>
+
 <body>
 
-    <video autoplay muted loop id="video-bg">
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-abstract-technology-server-room-background-31714-large.mp4" type="video/mp4">
-    </video>
+<div class="topbarContainer" id="mainTopbarContainer">
+<div class="kemmsTop">KEMMSOFT BETA 4.0.0</div>
 
-    <div class="header-ui">
-        <div class="brand">KEMMSOFT STOCK 8V</div>
-        <div class="voice-status">
-            <div class="pulse-mic" id="mic-indicator"></div>
-            <span id="status-text">KLIKNĚTE KAMKOLI PRO START HLASU</span>
-        </div>
-        <nav>
-            <button onclick="showSection('overview')">Přehled (TV)</button>
-            <button onclick="showSection('inventory')">Obsah skladu</button>
-            <button onclick="showSection('admin')">Admin</button>
-        </nav>
+<div class="vzkazTickerContainer">
+    <div class="vzkazTicker" id="tickerText">Žádné nové vzkazy.</div>
+</div>
+
+<div class="topbar" id="topbar">
+<button id="nav-setup" class="active-nav" onclick="setupMode()">Nastavení</button>
+<button id="nav-production" onclick="productionMode()">Výrobní obrazovka</button>
+<button id="nav-requests" onclick="requestsMode()">Zadání požadavku</button>
+</div>
+</div>
+
+<div class="header" id="mainHeader">---</div>
+
+<div id="setupScreen">
+<div class="layout">
+<div>
+<div class="rowTop" id="rowTop"></div>
+<div class="rowBottom" id="rowBottom"></div>
+</div>
+
+<div class="queue">
+<div class="queueTitle">Nadcházející požadavky</div>
+<div id="queueList"></div>
+
+<h4>Přidat nový požadavek</h4>
+<input id="setupKontakt" placeholder="Číslo kontaktu">
+<input id="setupPrurez" placeholder="Průřez">
+<input id="setupJmeno" placeholder="Jméno">
+<button class="addBtn" onclick="addRequestSetup()">Odeslat požadavek</button>
+
+<div class="vzkazSection">
+    <h4>Napsat vzkaz na tabuli</h4>
+    <input id="setupVzkaz" placeholder="Text vzkazu...">
+    <button class="addBtn vzkazBtn" onclick="sendVzkaz('setupVzkaz')">Odeslat vzkaz</button>
+    
+    <h4 style="margin-top:15px; margin-bottom:5px;">Aktivní vzkazy na tabuli:</h4>
+    <div class="vzkazyList" id="setupVzkazyList">Žádné aktivní vzkazy</div>
+</div>
+
+<div class="qrSection">
+    <h4>QR kód pro zadání požadavku</h4>
+    <div class="qrContainer">
+        <img id="qrCodeImg" src="" alt="QR Kód pro zadávání požadavků">
     </div>
+</div>
 
-    <div id="voice-dialog" class="section">
-        <div id="voice-overlay">
-            <h1 id="voice-prompt" style="color: var(--primary); font-size: 2.5rem; margin-bottom: 10px;">Inicializace...</h1>
-            <div id="voice-card-showcase"></div>
-            <div class="speech-preview" id="speech-preview">Čekám...</div>
-        </div>
-    </div>
+</div>
+</div>
+</div>
 
-    <div id="overview" class="section active">
-        <div id="carousel-viewport"><div id="carousel-track"></div></div>
-        <div class="critical-bar"><div class="ticker-wrap" id="ticker-content"></div></div>
-    </div>
+<div id="productionScreen" class="production">
+<div class="layout">
+<div>
+<div class="rowTop" id="prodTop"></div>
+<div class="rowBottom" id="prodBottom"></div>
+</div>
+<div class="queue">
+<div class="queueTitle">Nadcházející požadavky</div>
+<div id="prodQueue"></div>
+</div>
+</div>
+</div>
 
-    <div id="inventory" class="section">
-        <div class="inventory-container">
-            <h1>Skladová evidence</h1>
-            <table>
-                <thead><tr><th>ID</th><th>Název</th><th>Skladem</th><th>Minimum</th><th>Status</th></tr></thead>
-                <tbody id="inventory-list"></tbody>
-            </table>
-        </div>
-    </div>
+<div id="requestsScreen" class="production">
+<div style="max-width:420px;margin:0 auto;">
+<h3>Zadání požadavku</h3>
+<input id="kontakt" placeholder="Číslo kontaktu">
+<input id="prurez" placeholder="Průřez">
+<input id="jmeno" placeholder="Jméno">
+<button class="addBtn" onclick="addRequest()">Odeslat požadavek</button>
 
-    <div id="admin" class="section">
-        <div class="admin-form">
-            <h2>Přidat / Upravit díl</h2>
-            <input type="text" id="itemNum" placeholder="ID (Katalogové číslo)">
-            <input type="text" id="itemName" placeholder="Název náhradního dílu">
-            <input type="number" id="itemCount" placeholder="Aktuální stav (ks)">
-            <input type="number" id="itemMin" placeholder="Minimální limit (ks)">
-            <button onclick="addItem()" style="width: 100%; margin-top: 10px; background: var(--primary); color: black; font-weight: bold;">ULOŽIT ZMĚNY</button>
-            <button onclick="clearAll()" style="width: 100%; margin-top: 20px; opacity: 0.3; font-size: 0.7rem;">Reset celého skladu</button>
-        </div>
-    </div>
+<div class="vzkazSection">
+    <h4>Napsat vzkaz na tabuli</h4>
+    <input id="reqVzkaz" placeholder="Text vzkazu...">
+    <button class="addBtn vzkazBtn" onclick="sendVzkaz('reqVzkaz')">Odeslat vzkaz</button>
+</div>
+</div>
+</div>
 
-    <script>
-        let stock = JSON.parse(localStorage.getItem('k_stock_v8_priorities')) || [
-            { id: "101", name: "Senzor tlaku", count: 12, min: 5, isKey: false },
-            { id: "102", name: "Servomotor 8V", count: 2, min: 3, isKey: true }
-        ];
-        let pos = 0;
-        let animationFrame;
-        
-        let voiceState = "IDLE"; 
-        let currentAction = null; 
-        let targetItem = null;
-        let targetQty = 0;
-        
-        let recognition = null;
-        let isSpeaking = false;
-        let shouldListen = false;
-        let restartTimeout = null;
+<div id="productionFixedQrContainer" class="production-fixed-qr">
+    <img id="prodQrCodeImg" src="" alt="QR Kód pro zadávání požadavků">
+</div>
 
-        try {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.lang = 'cs-CZ';
-                recognition.continuous = false;
-                recognition.interimResults = false;
-            }
-        } catch(e) {
-            console.error("Chyba inicializace API: ", e);
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getDatabase, ref, push, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+const firebaseConfig={
+    apiKey:"AIzaSyAhiCfh-Di_NdPO5rGM7CZFQGaSymcdWxI",
+    authDomain:"lisyweb-df6d9.firebaseapp.com",
+    databaseURL:"https://lisyweb-df6d9-default-rtdb.firebaseio.com/",
+    projectId:"lisyweb-df6d9"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+
+const LIS_COUNT=8;
+let lisy=[];
+let pozadavky=[];
+let lastPozadavky = []; 
+let lastLisy=[]; 
+
+function emptyLis(){ return {kontakt:"",prurez:"",jmeno:"",time:""} }
+function timeNow(){ return new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}) }
+
+window.setupMode = function() {
+    document.getElementById("setupScreen").style.display = "block";
+    document.getElementById("productionScreen").style.display = "none";
+    document.getElementById("requestsScreen").style.display = "none";
+    document.getElementById("productionFixedQrContainer").style.display = "none"; 
+    document.getElementById("mainTopbarContainer").classList.remove("hidden"); // Zobrazit lištu v adminu
+    updateActiveNav("nav-setup");
+}
+
+window.productionMode = function() {
+    document.getElementById("setupScreen").style.display = "none";
+    document.getElementById("productionScreen").style.display = "block";
+    document.getElementById("requestsScreen").style.display = "none";
+    document.getElementById("productionFixedQrContainer").style.display = "block"; 
+    document.getElementById("mainTopbarContainer").classList.remove("hidden"); // Zobrazit lištu ve výrobě
+    updateActiveNav("nav-production");
+}
+
+window.requestsMode = function() {
+    document.getElementById("setupScreen").style.display = "none";
+    document.getElementById("productionScreen").style.display = "none";
+    document.getElementById("requestsScreen").style.display = "flex";
+    document.getElementById("productionFixedQrContainer").style.display = "none"; 
+    
+    // Zjistíme, jestli uživatel přišel přes QR kód (#requests v URL)
+    if(window.location.hash === "#requests") {
+        document.getElementById("mainTopbarContainer").classList.add("hidden"); // Kompletně skryje Topbar lištu s navigací
+    } else {
+        document.getElementById("mainTopbarContainer").classList.remove("hidden");
+    }
+    
+    updateActiveNav("nav-requests");
+}
+
+function updateActiveNav(activeId) {
+    document.getElementById("nav-setup").classList.remove("active-nav");
+    document.getElementById("nav-production").classList.remove("active-nav");
+    document.getElementById("nav-requests").classList.remove("active-nav");
+    document.getElementById(activeId).classList.add("active-nav");
+}
+
+window.playTone = function() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 523.25; 
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.stop(ctx.currentTime + 0.3);
+    } catch(e) { console.log("Audio API nepodporováno"); }
+}
+
+function updateMainHeaderDisplay(text){
+    const header=document.getElementById("mainHeader");
+    if(!header) return;
+    if (header.innerText !== text) {
+        header.innerText = text;
+        if (text !== "---") {
+            header.classList.add("blink"); 
+            setTimeout(() => header.classList.remove("blink"), 8000); 
+        } else {
+            header.classList.remove("blink"); 
         }
+    }
+}
 
-        function speak(text, callback) {
-            isSpeaking = true;
-            shouldListen = false;
-            if (restartTimeout) clearTimeout(restartTimeout);
-            
-            try { recognition.stop(); } catch(e) {}
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'cs-CZ';
-            
-            utterance.onend = () => { 
-                isSpeaking = false;
-                shouldListen = true;
-                restartTimeout = setTimeout(triggerListen, 400);
-                if (callback) callback();
-            };
-            window.speechSynthesis.speak(utterance);
-        }
+window.sendVzkaz = function(inputId) {
+    const inputEl = document.getElementById(inputId);
+    if (!inputEl) return;
+    const textvzkazu = inputEl.value.trim();
+    if(!textvzkazu) {
+        alert("Napiš nejdřív nějaký text vzkazu!");
+        return;
+    }
+    const novyVzkazRef = push(ref(db, 'vzkazy_list'));
+    set(novyVzkazRef, {
+        text: textvzkazu,
+        time: Date.now()
+    });
+    inputEl.value = ""; 
+}
 
-        function triggerListen() {
-            if (!recognition || isSpeaking || !shouldListen) return;
-            try {
-                recognition.start();
-            } catch(e) {
-                // Zachytí pokusy o duplicitní spuštění
-            }
-        }
+window.deleteVzkaz = function(key) {
+    remove(ref(db, 'vzkazy_list/' + key));
+}
 
-        if (recognition) {
-            recognition.onstart = function() {
-                if (voiceState === "IDLE") {
-                    document.getElementById('mic-indicator').className = "pulse-mic ready";
-                    document.getElementById('status-text').innerText = 'Hlasový asistent připraven (Řekněte "KEMSOFT")';
-                } else {
-                    document.getElementById('mic-indicator').className = "pulse-mic listening";
-                }
-            };
+onValue(ref(db, 'vzkazy_list'), snap => {
+    const data = snap.val();
+    const ticker = document.getElementById("tickerText");
+    const listEl = document.getElementById("setupVzkazyList");
+    
+    if(!ticker) return;
 
-            recognition.onend = function() {
-                if (restartTimeout) clearTimeout(restartTimeout);
-                // Když Edge nebo Chrome ukončí spojení (aborted nebo ticho), s lehkou pauzou nahodíme znovu
-                if (shouldListen && !isSpeaking) {
-                    restartTimeout = setTimeout(triggerListen, 500);
-                }
-            };
+    if(data) {
+        const vzkazyPole = Object.entries(data).map(([key, val]) => ({...val, key})).sort((a,b) => b.time - a.time);
+        let tickerText = "⚠️ ";
+        vzkazyPole.forEach((v, index) => {
+            const cas = new Date(v.time).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+            tickerText += `VZKAZ: ${v.text} (${cas}) `;
+            if(index < vzkazyPole.length - 1) tickerText += `   *** `;
+        });
+        tickerText += `            *** `;
+        ticker.innerText = tickerText;
 
-            recognition.onerror = function(event) {
-                console.log("Hlasový log hlásí stav: ", event.error);
-                if (event.error === 'not-allowed') {
-                    document.getElementById('status-text').innerText = "Chyba: Povolte mikrofon nahoře v URL adrese!";
-                    document.getElementById('status-text').style.color = "var(--danger)";
-                }
-                
-                if (restartTimeout) clearTimeout(restartTimeout);
-                // Inteligentní prodleva při chybách (zejména při 'aborted' z Edge)
-                if (shouldListen && !isSpeaking) {
-                    let delay = event.error === 'aborted' ? 800 : 400;
-                    restartTimeout = setTimeout(triggerListen, delay);
-                }
-            };
-
-            recognition.onresult = function(event) {
-                const result = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-                document.getElementById('speech-preview').innerText = `Slyšeno: "${result}"`;
-                
-                if (result.includes("konec")) {
-                    speak("Rozkaz. Zavírám operaci.", () => { resetVoiceSystem(); });
-                    return;
-                }
-
-                switch(voiceState) {
-                    case "IDLE":
-                        if (result.includes("kemsoft") || result.includes("kemmsoft")) {
-                            voiceState = "ACTION_CHOOSE";
-                            showSection('voice-dialog');
-                            document.getElementById('voice-overlay').style.display = 'block';
-                            document.getElementById('voice-prompt').innerText = "Chcete naskladnit nebo vyskladnit?";
-                            speak("Chcete naskladnit nebo vyskladnit?");
-                        }
-                        break;
-
-                    case "ACTION_CHOOSE":
-                        if (result.includes("naskladnit")) {
-                            currentAction = "IN";
-                            goToGetItem();
-                        } else if (result.includes("vyskladnit")) {
-                            currentAction = "OUT";
-                            goToGetItem();
-                        } else {
-                            speak("Prosím zvolte: naskladnit nebo vyskladnit.");
-                        }
-                        break;
-
-                    case "ITEM_CHOOSE":
-                        let found = stock.find(item => result.includes(item.name.toLowerCase()) || result.includes(item.id));
-                        if (found) {
-                            targetItem = found;
-                            voiceState = "QTY_CHOOSE";
-                            let promptText = currentAction === "IN" ? "Jaké množství přidáte?" : "Jaké množství odeberete?";
-                            document.getElementById('voice-prompt').innerText = promptText;
-                            speak(promptText);
-                        } else {
-                            speak("Takový díl nemám v databázi. Zkuste to znovu.");
-                        }
-                        break;
-
-                    case "QTY_CHOOSE":
-                        let match = result.match(/\d+/);
-                        if (match) {
-                            targetQty = parseInt(match[0]);
-                            executeVoiceTransaction();
-                        } else {
-                            speak("Řekněte množství jako číslo.");
-                        }
-                        break;
-                }
-            };
-        }
-
-        function goToGetItem() {
-            voiceState = "ITEM_CHOOSE";
-            document.getElementById('voice-prompt').innerText = "Jakou položku?";
-            speak("Jakou položku?");
-        }
-
-        function executeVoiceTransaction() {
-            let oldQty = targetItem.count;
-            if (currentAction === "IN") {
-                targetItem.count += targetQty;
-            } else {
-                if(targetQty > targetItem.count) {
-                    speak("Nelze provést. Skladový stav je příliš nízký.");
-                    resetVoiceSystem();
-                    return;
-                }
-                targetItem.count -= targetQty;
-            }
-
-            localStorage.setItem('k_stock_v8_priorities', JSON.stringify(stock));
-            const critical = targetItem.count <= targetItem.min;
-            
-            document.getElementById('voice-prompt').innerText = "Transakce úspěšná";
-            document.getElementById('voice-card-showcase').innerHTML = `
-                <div class="card ${critical ? 'is-critical' : ''}" style="margin: 30px auto; float:none;">
-                    <div style="display:flex; justify-content:space-between; color: var(--primary)">
-                        <span>ID: ${targetItem.id}</span>
-                        <span>${critical ? 'STAV: KRITICKÝ' : 'STAV: V POŘÁDKU'}</span>
-                    </div>
-                    <h1 style="margin: 20px 0;">${targetItem.name}</h1>
-                    <div class="stock-val">${targetItem.count} <small style="font-size:1.5rem">ks</small></div>
-                    <div class="delta-val" style="color: ${currentAction === 'IN' ? '#2ecc71' : 'var(--danger)'}">
-                        ${currentAction === 'IN' ? '▲ NASKLADNĚNO' : '▼ VYSKLADNĚNO'}: ${targetQty} ks (Původně: ${oldQty} ks)
-                    </div>
-                </div>
-            `;
-
-            speak(`Aktualizováno. Nový stav je ${targetItem.count} kusů. Řekněte konec pro návrat.`);
-        }
-
-        function resetVoiceSystem() {
-            voiceState = "IDLE";
-            currentAction = null;
-            targetItem = null;
-            targetQty = 0;
-            document.getElementById('mic-indicator').className = "pulse-mic ready";
-            document.getElementById('status-text').innerText = 'Hlasový asistent připraven (Řekněte "KEMSOFT")';
-            document.getElementById('voice-card-showcase').innerHTML = '';
-            document.getElementById('speech-preview').innerText = 'Čekám...';
-            showSection('overview');
-        }
-
-        function showSection(id) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            cancelAnimationFrame(animationFrame);
-            if (id === 'overview') initCarousel();
-            else if (id === 'inventory') renderTable();
-            updateTicker();
-        }
-
-        function addItem() {
-            const id = document.getElementById('itemNum').value.trim();
-            const name = document.getElementById('itemName').value.trim();
-            const count = parseInt(document.getElementById('itemCount').value);
-            const min = parseInt(document.getElementById('itemMin').value);
-
-            if (!id || isNaN(count)) return alert('Zadejte data!');
-            
-            const existingIndex = stock.findIndex(item => item.id === id);
-            if (existingIndex !== -1) {
-                stock[existingIndex].count = count;
-                if(name) stock[existingIndex].name = name;
-                if(!isNaN(min)) stock[existingIndex].min = min;
-            } else {
-                stock.push({ id, name: name || "Nový komponent", count, min: min || 0, isKey: false });
-            }
-            localStorage.setItem('k_stock_v8_priorities', JSON.stringify(stock));
-            alert('Data uložena!');
-            document.querySelectorAll('input').forEach(i => i.value = '');
-        }
-
-        function renderTable() {
-            document.getElementById('inventory-list').innerHTML = stock.map(item => `
-                <tr style="color: ${item.count <= item.min ? 'var(--danger)' : 'white'}">
-                    <td>${item.id}</td><td>${item.name}</td><td><strong>${item.count} ks</strong></td><td>${item.min} ks</td><td>${item.count <= item.min ? '⚠️ DOPLNIT' : '✅ OK'}</td>
-                </tr>
-            `).join('');
-        }
-
-        function initCarousel() {
-            const track = document.getElementById('carousel-track');
-            if (stock.length === 0) return;
-            const fullList = [...stock, ...stock, ...stock];
-            track.innerHTML = fullList.map(item => {
-                const critical = item.count <= item.min;
-                return `
-                    <div class="card ${item.isKey ? 'is-key' : ''} ${critical ? 'is-critical' : ''}">
-                        <div style="display:flex; justify-content:space-between; color: ${item.isKey ? 'var(--warning)' : 'var(--primary)'}"><span>ID: ${item.id}</span></div>
-                        <h1 style="margin: 20px 0;">${item.name}</h1>
-                        <div class="stock-val">${item.count} <small style="font-size: 1.5rem">ks</small></div>
-                        <p>Minimum: ${item.min} ks</p>
+        if(listEl) {
+            listEl.innerHTML = "";
+            vzkazyPole.forEach(v => {
+                const cas = new Date(v.time).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+                listEl.innerHTML += `
+                    <div class="vzkazItem">
+                        <div>
+                            <span>${v.text}</span>
+                            <small>Odesláno: ${cas}</small>
+                        </div>
+                        <button onclick="deleteVzkaz('${v.key}')">❌ Smazat</button>
                     </div>
                 `;
-            }).join('');
-            pos = 0;
-            animate();
+            });
         }
+    } else {
+        ticker.innerText = "Žádné nové vzkazy.";
+        if(listEl) listEl.innerHTML = '<div style="color:#94a3b8; padding:10px; font-size:0.9em;">Žádné aktivní vzkazy</div>';
+    }
+});
 
-        function animate() {
-            const track = document.getElementById('carousel-track');
-            const cardWidth = 500 + 60; 
-            const resetPoint = cardWidth * stock.length;
-            pos -= 1.2; 
-            if (Math.abs(pos) >= resetPoint) pos = 0;
-            if(track) track.style.transform = `translateX(${pos}px)`;
-            animationFrame = requestAnimationFrame(animate);
-        }
+onValue(ref(db,'lisy'),async snap=>{ 
+  const data = snap.val();
+  const currentLisy = data ? Object.values(data) : Array.from({length:LIS_COUNT},()=>emptyLis());
+  
+  for (let i = 0; i < LIS_COUNT; i++) {
+    const lis = currentLisy[i] || emptyLis();
+    const oldLis = lastLisy[i] || emptyLis();
 
-        function updateTicker() {
-            const criticals = stock.filter(i => i.count <= i.min);
-            document.getElementById('ticker-content').innerHTML = criticals.length > 0 ? 
-                "⚠️ NEDOSTATEK ZÁSOB: " + criticals.map(i => `${i.name} (${i.count}ks)`).join(" +++ ") : "VŠECHNY POLOŽKY V NORMĚ • KEMMSOFT 8V";
-        }
+    const hasContact = !!lis.kontakt;
+    const oldHasContact = !!(oldLis && oldLis.kontakt);
+    const dataChanged = (hasContact && (!oldHasContact || oldLis.kontakt !== lis.kontakt || oldLis.prurez !== lis.prurez || oldLis.jmeno !== lis.jmeno));
+    
+    if (hasContact && dataChanged) {
+        autoBlink(i); 
+    }
+  }
 
-        function clearAll() { if(confirm('Smazat vše?')) { localStorage.clear(); stock = []; location.reload(); } }
+  lisy = currentLisy;
+  while(lisy.length<LIS_COUNT) lisy.push(emptyLis());
+  lastLisy = JSON.parse(JSON.stringify(lisy)); 
+  renderAll();
+});
 
-        window.onload = () => {
-            initCarousel();
-            document.body.addEventListener('click', () => {
-                if(!shouldListen) {
-                    shouldListen = true;
-                    document.getElementById('status-text').innerText = "Spouštím mikrofon...";
-                    triggerListen();
-                }
-            }, { once: true });
-        };
-    </script>
+onValue(ref(db,'pozadavky'), snap => {
+  const data = snap.val();
+  const currentPozadavky = data ? Object.entries(data).map(([k,v])=>({...v,key:k})).sort((a,b)=>a.time-b.time) : [];
+  
+  currentPozadavky.forEach(p => {
+      if (!lastPozadavky.some(oldP => oldP.key === p.key)) {
+          setTimeout(() => {
+              const setupQueueItem = document.getElementById(`request-${p.key}`);
+              const prodQueueItem = document.getElementById(`prodRequest-${p.key}`); 
+
+              if (setupQueueItem) {
+                  setupQueueItem.classList.add('new-request-pulse');
+                  setTimeout(() => { setupQueueItem.classList.remove('new-request-pulse'); }, 4000); 
+              }
+              if (prodQueueItem) { 
+                  prodQueueItem.classList.add('new-request-pulse');
+                  setTimeout(() => { prodQueueItem.classList.remove('new-request-pulse'); }, 4000); 
+              }
+          }, 50); 
+      }
+  });
+
+  pozadavky = currentPozadavky;
+  lastPozadavky = JSON.parse(JSON.stringify(currentPozadavky)); 
+  renderAll();
+});
+
+function renderAll(){
+    renderLisy("rowTop","rowBottom",true); 
+    renderLisy("prodTop","prodBottom",false);
+    renderQueue("queueList"); 
+    renderProductionQueue(); 
+}
+
+function renderLisy(topID, bottomID, isSetup){
+    const top=document.getElementById(topID);
+    const bottom=document.getElementById(bottomID);
+    if(!top || !bottom) return;
+    top.innerHTML=""; bottom.innerHTML="";
+
+    for(let i=0; i<LIS_COUNT; i++){
+        const d = lisy[i] || emptyLis();
+        const assigned = d.kontakt !== "";
+        const cardId = isSetup ? `lis${i}` : `prodLis${i}`;
+        
+        const html = `
+            <div class="card ${assigned?'assigned':''}" id="${cardId}">
+                <div class="lis">LIS ${i+1}</div>
+                <div class="kontakt">${d.kontakt||"---"}</div>
+                <div class="prurez">${d.prurez||"---"}</div>
+                <div class="jmeno">${d.jmeno||"---"}</div>
+                <div class="time">${d.time?timeNow():""}</div>
+                ${isSetup ? `<button class="hotovo" onclick="clearLis(${i})">HOTOVO</button>` : ""}
+            </div>
+        `;
+        if(i<4) top.innerHTML += html;
+        else bottom.innerHTML += html;
+    }
+}
+
+function renderQueue(id){ 
+ const q=document.getElementById(id);
+ if(!q) return;
+ q.innerHTML="";
+
+ pozadavky.forEach((p,i)=>{
+  q.innerHTML+=`<div class="queueItem" id="request-${p.key}">
+  <b>${p.kontakt}</b> - ${p.prurez} - ${p.jmeno}
+<span class="time">${new Date(p.time).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})}</span>
+   <div class="assign">
+    ${[0,1,2,3,4,5,6,7].map(l=>`<button onclick="assignRequest(${l}, '${p.key}')">L${l+1}</button>`).join('')}
+    <button class="deleteBtn" onclick="deleteRequest('${p.key}')">❌</button>
+   </div>
+  </div>`;
+ });
+}
+
+function renderProductionQueue(){ 
+ const q=document.getElementById("prodQueue");
+ if(!q)return;
+ q.innerHTML="";
+
+ pozadavky.forEach(p=>{
+  q.innerHTML+=`<div class="queueItem" id="prodRequest-${p.key}">
+   <b>${p.kontakt}</b> - ${p.prurez} - ${p.jmeno}
+   <div class="time">${new Date(p.time).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})}</div>
+  </div>`;
+ });
+}
+
+window.assignRequest=async function(lisIndex, requestKey){ 
+  const p=pozadavky.find(req => req.req === requestKey || req.key === requestKey);
+  if(!p) return;
+
+  await set(ref(db,`lisy/${lisIndex}`),{
+    kontakt:p.kontakt,
+    prurez:p.prurez,
+    jmeno:p.jmeno,
+    time:Date.now()
+  });
+  
+  const headerText = `${p.kontakt} - ${p.prurez} - ${p.jmeno} → LIS ${lisIndex + 1}`;
+  updateMainHeaderDisplay(headerText);
+  remove(ref(db,'pozadavky/'+p.key));
+}
+
+window.clearLis = async function(i){
+    await set(ref(db, `lisy/${i}`), emptyLis());
+    updateMainHeaderDisplay("---"); 
+};
+
+window.deleteRequest=function(key){ remove(ref(db,'pozadavky/'+key)); } 
+
+window.addRequest=function(){ 
+ const kontaktInput=document.getElementById("kontakt");
+ const prurezInput=document.getElementById("prurez");
+ const jmenoInput=document.getElementById("jmeno");
+
+ const kontakt=kontaktInput.value;
+ const prurez=prurezInput.value;
+ const jmeno=jmenoInput.value;
+
+ if(!kontakt || !prurez || !jmeno) { 
+    alert("Prosím vyplňte všechna pole!");
+    return;
+ }
+
+ const newRef=push(ref(db,'pozadavky'));
+ set(newRef,{kontakt,prurez,jmeno,time:Date.now()});
+
+ kontaktInput.value="";
+ prurezInput.value="";
+ jmenoInput.value="";
+ kontaktInput.focus();
+}
+
+window.addRequestSetup=function(){ 
+    const kontakt=document.getElementById("setupKontakt").value;
+    const prurez=document.getElementById("setupPrurez").value;
+    const jmeno=document.getElementById("setupJmeno").value;
+    if(!kontakt || !prurez || !jmeno) { 
+        alert("Prosím vyplňte všechna pole!");
+        return;
+    }
+    const newRef=push(ref(db,'pozadavky'));
+    set(newRef,{kontakt,prurez,jmeno,time:Date.now()});
+    document.getElementById("setupKontakt").value="";
+    document.getElementById("setupPrurez").value="";
+    document.getElementById("setupJmeno").value="";
+}
+
+function autoBlink(i){ 
+    const card=document.getElementById("lis"+i);
+    const prod=document.getElementById("prodLis"+i);
+    
+    if(card) {
+        card.classList.add("active");
+        setTimeout(()=>{
+            card.classList.remove("active");
+            card.classList.add("assigned");
+        },1000);
+    }
+    if(prod) { 
+        prod.classList.add("active");
+        setTimeout(()=>{
+            prod.classList.remove("active");
+            prod.classList.add("assigned");
+        },1000);
+    }
+    playTone();
+}
+
+function generateQR() {
+    const cleanUrl = window.location.href.split('#')[0];
+    const targetUrl = cleanUrl + "#requests";
+    
+    const qrImgEl = document.getElementById("qrCodeImg");
+    if(qrImgEl) {
+        qrImgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`;
+    }
+    
+    const prodQrImgEl = document.getElementById("prodQrCodeImg");
+    if(prodQrImgEl) {
+        prodQrImgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(targetUrl)}`;
+    }
+}
+
+window.onload = function() {
+    if(window.location.hash === "#requests") {
+        requestsMode();
+    } else {
+        setupMode();
+    }
+    generateQR();
+}
+</script>
 </body>
 </html>
